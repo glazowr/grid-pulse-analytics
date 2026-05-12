@@ -1,4 +1,4 @@
-package com.glazowr.device_service.config;
+package com.glazowr.user_service.config;
 
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;

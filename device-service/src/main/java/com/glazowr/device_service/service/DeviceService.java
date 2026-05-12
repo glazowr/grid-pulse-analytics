@@ -15,6 +15,8 @@ public class DeviceService {
 
     private DeviceRepository deviceRepository;
 
+    private final CacheManager cacheManager;
+
     public DeviceService(DeviceRepository deviceRepository, CacheManager cacheManager) {
         this.deviceRepository = deviceRepository;
         this.cacheManager = cacheManager;
@@ -61,6 +63,9 @@ public class DeviceService {
         if (!deviceRepository.existsById(id)) {
             throw new DeviceNotFoundException("Device not found with id " + id);
         }
+        Device existing = deviceRepository.findById(id)
+                .orElseThrow(() ->
+                        new DeviceNotFoundException("Device not found with id " + id));
         deviceRepository.deleteById(id);
         evictDeviceCaches(existing.getId(), existing.getUserId());
     }

@@ -17,37 +17,36 @@ import static org.springframework.cloud.gateway.server.mvc.handler.GatewayRouter
 import static org.springframework.cloud.gateway.server.mvc.handler.HandlerFunctions.http;
 
 @Configuration
-public class DeviceServiceRoutes {
-
-
-    // In Spring Cloud Gateway + Resilience4j, the circuit breaker gets created dynamically when you reference it by name
+public class UsageServiceRoutes {
 
     @Bean
-    public RouterFunction<ServerResponse> deviceRoute() {
-        return route("device-service")
-                .route(RequestPredicates.path("/api/v1/device/**"), http())
-                .before(uri("http://localhost:8081"))
+    public RouterFunction<ServerResponse> usageRoute() {
+        return route("usage-service")
+                .route(RequestPredicates.path("/api/v1/usage/**"), http())
+                .before(uri("http://localhost:8083"))
                 .filter(CircuitBreakerFilterFunctions.circuitBreaker(
-                        "deviceServiceCircuitBreaker",
-                        URI.create("forward:/fallbackRoute")))
+                        "usageServiceCircuitBreaker",
+                        URI.create("forward:/usageFallbackRoute")
+                ))
                 .build();
     }
 
     @Bean
-    public RouterFunction<ServerResponse> deviceFallbackRoute() {
-        return route("fallbackRoute")
-                .route(RequestPredicates.path("/fallbackRoute"),
-                        request-> ServerResponse.status(HttpStatus.SERVICE_UNAVAILABLE)
-                                .body("Device service is down"))
+    public RouterFunction<ServerResponse> usageFallbackRoute() {
+        return route("usage-fallback-route")
+                .route(RequestPredicates.path("/usageFallbackRoute"),
+                        request -> ServerResponse
+                                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                                .body("Usage service is down"))
                 .build();
     }
 
     @Bean
-    public RouterFunction<ServerResponse> deviceServiceApiDocs() {
-        return GatewayRouterFunctions.route("device-service-api-docs")
-                .route(RequestPredicates.path("/docs/device-service/v3/api-docs"),
+    public RouterFunction<ServerResponse> usageServiceApiDocs() {
+        return GatewayRouterFunctions.route("usage-service-api-docs")
+                .route(RequestPredicates.path("/docs/usage-service/v3/api-docs"),
                         http())
-                .before(uri("http://localhost:8081"))
+                .before(uri("http://localhost:8083"))
                 .filter(setPath("/v3/api-docs"))
                 .build();
     }
