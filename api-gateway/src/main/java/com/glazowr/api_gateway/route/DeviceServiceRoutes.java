@@ -16,6 +16,27 @@ import static org.springframework.cloud.gateway.server.mvc.filter.FilterFunction
 import static org.springframework.cloud.gateway.server.mvc.handler.GatewayRouterFunctions.route;
 import static org.springframework.cloud.gateway.server.mvc.handler.HandlerFunctions.http;
 
+
+/**
+ *
+ * Client Request
+ *     ↓
+ * /api/v1/device/**
+ *     ↓
+ * Forwarded to localhost:8081
+ *     ↓
+ * If service fails / timeout / CB opens
+ *     ↓
+ * forward:/fallbackRoute
+ *     ↓
+ * Internal Spring dispatch
+ *     ↓
+ * deviceFallbackRoute()
+ *     ↓
+ * 503 SERVICE_UNAVAILABLE
+ *
+**/
+
 @Configuration
 public class DeviceServiceRoutes {
 

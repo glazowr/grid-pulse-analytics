@@ -57,7 +57,12 @@ public class UsageService {
     }
 
     @KafkaListener(topics = "energy-usage", groupId = "usage-service")
-    public void energyUsageEvent(EnergyUsageEvent energyUsageEvent) {
+    public void energyUsageEvent(
+            @Payload EnergyUsageEvent energyUsageEvent,
+            @Header(KafkaHeaders.RECEIVED_KEY) String key,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition
+    ) {
+        log.info( "Received event for key={} partition={}", key, partition);
         // log.info("Received energy usage event: {}", energyUsageEvent);
         Point point = Point.measurement("energy_usage")
                 .addTag("deviceId", String.valueOf(energyUsageEvent.deviceId()))

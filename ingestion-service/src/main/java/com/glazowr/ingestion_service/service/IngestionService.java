@@ -25,7 +25,12 @@ public class IngestionService {
                 .build();
 
         // Send to Kafka Topic
-        kafkaTemplate.send("energy-usage", event);
+        // all events for same deviceId hash to same partition, ordering preserved PER DEVICE
+        kafkaTemplate.send(
+                "energy-usage",
+                String.valueOf(event.deviceId()),
+                event
+        );
         log.info("Ingested Energy Usage Event: {}", event);
     }
 }
