@@ -9,6 +9,9 @@ import java.time.Instant;
 
 @Builder
 public record EnergyUsageDto (
+
+        String eventId,
+
         @NotNull(message = "Device ID cannot be null")
         @Positive(message = "Device ID must be positive")
         Long deviceId,

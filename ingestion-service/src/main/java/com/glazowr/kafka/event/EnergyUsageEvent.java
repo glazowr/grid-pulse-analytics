@@ -6,8 +6,10 @@ import lombok.Builder;
 import java.time.Instant;
 
 @Builder
-public record EnergyUsageEvent (
+public record EnergyUsageEvent(
+        String eventId,
         Long deviceId,
         double energyConsumed,
         @JsonFormat(shape = JsonFormat.Shape.STRING)
-        Instant timestamp) {}
+        Instant timestamp
+) {}

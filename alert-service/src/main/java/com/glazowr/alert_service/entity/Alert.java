@@ -1,29 +1,59 @@
 package com.glazowr.alert_service.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.persistence.*;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Data
+@Entity
+@Table(
+        name = "alert",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_dedupe_window",
+                columnNames = {
+                        "user_id",
+                        "dedupe_key",
+                        "window_start"
+                }
+        )
+)
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Entity
-@Table(name = "alert")
 public class Alert {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     private Long userId;
+
+    private String email;
+
+    @Column(length = 500)
+    private String message;
+
+    private Double threshold;
+
+    private Double energyConsumed;
+
     private LocalDateTime createdAt;
-    private boolean sent;
+
+    private LocalDateTime windowStart;
+
+    private String dedupeKey;
+
+    @Enumerated(EnumType.STRING)
+    private AlertStatus status;
+
+    private Integer retryCount;
+
+    @Column(length = 2000)
+    private String lastError;
+
+    private LocalDateTime sentAt;
+
+    private LocalDateTime processingStartedAt;
 }

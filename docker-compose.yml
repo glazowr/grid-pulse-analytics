@@ -84,9 +84,9 @@ services:
       # Speed up consumer group startup
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       # Auto-create topics if they don't already exist
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
       # Default number of partitions per topic
-      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_NUM_PARTITIONS: 3
 
     volumes:
       - ./docker/kafka_data:/var/lib/kafka/data

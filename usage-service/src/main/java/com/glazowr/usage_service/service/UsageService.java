@@ -21,6 +21,13 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.kafka.annotation.DltHandler;
+import org.springframework.kafka.annotation.RetryableTopic;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,29 +53,100 @@ public class UsageService {
 
     private final KafkaTemplate<String, AlertingEvent> kafkaTemplate;
 
+    private final InboxRepository inboxRepository;
+
     public UsageService(InfluxDBClient influxDBClient,
                         DeviceClient deviceClient,
                         UserClient userClient,
-                        KafkaTemplate<String, AlertingEvent> kafkaTemplate) {
+                        KafkaTemplate<String, AlertingEvent> kafkaTemplate,
+                        InboxRepository inboxRepository) {
         this.influxDBClient = influxDBClient;
         this.deviceClient = deviceClient;
         this.userClient = userClient;
         this.kafkaTemplate = kafkaTemplate;
+        this.inboxRepository = inboxRepository;
     }
 
+    @RetryableTopic(
+            attempts = "4",
+            backoff = @Backoff(
+                    delay = 1000,
+                    multiplier = 2.0
+            ),
+            dltTopicSuffix = ".DLT",
+            autoCreateTopics = "true"
+    )
     @KafkaListener(topics = "energy-usage", groupId = "usage-service")
     public void energyUsageEvent(
             @Payload EnergyUsageEvent energyUsageEvent,
             @Header(KafkaHeaders.RECEIVED_KEY) String key,
-            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.DELIVERY_ATTEMPT) Integer deliveryAttempt,
+            Acknowledgment acknowledgment
     ) {
+
+        // @Transactional ONLY covers transactional resources participating in Spring transaction manager like MySQL/JPA
+        // not Kafka broker, InfluxDB, REST calls, Redis (unless XA/configured)
         log.info( "Received event for key={} partition={}", key, partition);
-        // log.info("Received energy usage event: {}", energyUsageEvent);
+
+        final String eventId = energyUsageEvent.eventId();
+
+        if (inboxRepository.existsByEventIdAndEventType(eventId, "ENERGY_USAGE")) {
+            log.debug("Duplicate event {}", eventId);
+            acknowledgment.acknowledge();
+            return;
+        }
+
+        try {
+
+            // === EXISTING BUSINESS LOGIC ===
+            Point point = Point.measurement("energy_usage")
+                    .addTag("deviceId", String.valueOf(energyUsageEvent.deviceId()))
+                    .addField("energyConsumed", energyUsageEvent.energyConsumed())
+                    .time(energyUsageEvent.timestamp(), WritePrecision.MS);
+
+            influxDBClient.getWriteApiBlocking().writePoint(influxBucket, influxOrg, point);
+
+            // Crash AFTER influx BEFORE inbox insert: in this case we are accepting duplicate entries
+
+            inboxRepository.save(InboxEntry.forEnergyUsage(eventId));
+
+            // === MANUAL ACK ===
+            acknowledgment.acknowledge();
+
+        } catch (Exception e) {
+            log.error("Failed to process event {}: {}", eventId, e.getMessage());
+            throw e; // Don't ack - let retry/DLT handle
+        }
+
+/*         log.info("Received energy usage event: {}", energyUsageEvent);
         Point point = Point.measurement("energy_usage")
                 .addTag("deviceId", String.valueOf(energyUsageEvent.deviceId()))
                 .addField("energyConsumed", energyUsageEvent.energyConsumed())
                 .time(energyUsageEvent.timestamp(), WritePrecision.MS);
-        influxDBClient.getWriteApiBlocking().writePoint(influxBucket, influxOrg, point);
+        influxDBClient.getWriteApiBlocking().writePoint(influxBucket, influxOrg, point);*/
+    }
+
+    @DltHandler
+    public void dltHandler(
+            EnergyUsageEvent event,
+            @Header(KafkaHeaders.DLT_EXCEPTION_MESSAGE)
+            String exceptionMessage,
+            @Header(KafkaHeaders.RECEIVED_TOPIC)
+            String topic
+    ) {
+
+        log.error(
+                """
+                MESSAGE MOVED TO DLT
+                topic={}
+                event={}
+                error={}
+                """,
+                topic,
+                event,
+                exceptionMessage
+        );
     }
 
     @Scheduled(cron = "*/10 * * * * *")
